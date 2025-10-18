@@ -183,7 +183,7 @@ class RLHFDataset(Dataset):
         messages = self._build_messages(example)
         if self.image_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-            images = example[self.image_key]
+            images = example[self.image_key] if isinstance(example[self.image_key], list) else [example[self.image_key]]
             if self.image_dir is not None and len(images) != 0 and isinstance(images[0], str):  # image paths
                 images = [os.path.join(self.image_dir, image) for image in images]
 
@@ -222,6 +222,7 @@ class RLHFDataset(Dataset):
         if self.image_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
             images = example.pop(self.image_key)
+            images = images if isinstance(images, list) else [images]
             if self.image_dir is not None and len(images) != 0 and isinstance(images[0], str):  # image paths
                 images = [os.path.join(self.image_dir, image) for image in images]
 
