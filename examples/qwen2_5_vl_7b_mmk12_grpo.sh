@@ -12,4 +12,6 @@ python3 -m verl.trainer.main \
     trainer.experiment_name=qwen2_5_vl_7b_mmk12_grpo \
     trainer.n_gpus_per_node=8 \
     trainer.save_checkpoint_path=/mnt/blob-hptrainingwesteurope-pretraining-out/qingguo/easyr1/qwen2_5_vl_7b_mmk12_grpo \
-    trainer.load_checkpoint_path=/mnt/blob-hptrainingwesteurope-pretraining-out/qingguo/easyr1/qwen2_5_vl_7b_mmk12_grpo
+    trainer.load_checkpoint_path=/mnt/blob-hptrainingwesteurope-pretraining-out/qingguo/easyr1/qwen2_5_vl_7b_mmk12_grpo \
+    data.prompt_key=question \
+    data.image_key=image
