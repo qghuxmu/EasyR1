@@ -8,11 +8,12 @@ python3 -m verl.trainer.main \
     config=examples/config.yaml \
     data.train_files=limazhiluyao/MMK12@train \
     data.val_files=limazhiluyao/MMK12@test \
+    data.prompt_key=question \
+    data.image_key=image \
     worker.actor.model.model_path=${MODEL_PATH} \
     worker.rollout.n=6 \
     trainer.experiment_name=qwen2_5_vl_7b_mmk12_grpo \
     trainer.n_gpus_per_node=8 \
     trainer.save_checkpoint_path=/mnt/blob-hptrainingwesteurope-pretraining-out/qingguo/easyr1/qwen2_5_vl_7b_mmk12_grpo \
     trainer.load_checkpoint_path=/mnt/blob-hptrainingwesteurope-pretraining-out/qingguo/easyr1/qwen2_5_vl_7b_mmk12_grpo \
-    data.prompt_key=question \
-    data.image_key=image
+    trainer.save_limit=-1
