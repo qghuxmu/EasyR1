@@ -49,7 +49,7 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = False) -> dict[str
     sequence_score = batch.batch["token_level_scores"].sum(-1)
     sequence_reward = batch.batch["token_level_rewards"].sum(-1)
 
-    negatives_acc = batch.batch["negatives_accuracy"].mean(-1)
+    negatives_acc = batch.batch["negatives_accuracy"]
 
     advantages = batch.batch["advantages"]
     returns = batch.batch["returns"]
