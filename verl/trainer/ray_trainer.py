@@ -148,6 +148,10 @@ def compute_advantage(data: DataProto, adv_estimator: AdvantageEstimator, gamma:
 
     if "reward_baselines" in data.batch:
         adv_inputs["reward_baselines"] = data.batch["reward_baselines"]
+    
+    if "negatives_accuracy" in data.batch:
+        adv_inputs["negatives_accuracy"] = data.batch["negatives_accuracy"]
+        adv_inputs["penalty_coef"] = data.meta_info["penalty_coef"]
 
     advantages, returns = compute_advantage_return(adv_estimator, **adv_inputs)
     data.batch["advantages"] = advantages
@@ -509,6 +513,28 @@ class RayPPOTrainer:
                 new_batch.pop(batch_keys=list(gen_baseline_output.batch.keys()))
                 new_batch.batch["reward_baselines"] = reward_baseline_tensor
                 del gen_baseline_batch, gen_baseline_output
+
+            if self.config.algorithm.adv_estimator == "grpo_neg":
+                gen_negative_batch = DataProto.from_single_dict(
+                    {
+                        "input_ids": new_batch.batch.pop("text_only_input_ids"),
+                        "attention_mask": new_batch.batch.pop("text_only_attention_mask"),
+                        "position_ids": new_batch.batch.pop("text_only_position_ids"),
+                        "raw_prompt_ids": new_batch.non_tensor_batch.pop("text_only_raw_prompt_ids")
+                    }
+                )
+                gen_negative_batch.meta_info["n"] = self.config.algorithm.rollout_negative_samples
+                gen_negative_output = self.actor_rollout_ref_wg.generate_sequences(gen_negative_batch)
+
+                new_negative_batch = new_batch.repeat(repeat_times=self.config.algorithm.rollout_negative_samples, interleave=True)
+                new_negative_batch = new_negative_batch.union(gen_negative_output)
+                reward_negative_tensor, reward_negative_metrics = ray.get(self.reward_fn.compute_reward.remote(new_negative_batch))
+                negatives_accuracy = torch.tensor(reward_negative_metrics["accuracy"], dtype=torch.float32, device=reward_negative_tensor.device)
+                negatives_accuracy = negatives_accuracy.view(-1, self.config.algorithm.rollout_negative_samples).mean(dim=-1)
+
+                new_batch.batch["negatives_accuracy"] = negatives_accuracy
+                new_batch.meta_info["penalty_coef"] = self.config.algorithm.penalty_coef
+                del gen_negative_batch, gen_negative_output, new_negative_batch
 
             # repeat to align with repeated responses in rollout
             new_batch = new_batch.repeat(repeat_times=self.config.worker.rollout.n, interleave=True)

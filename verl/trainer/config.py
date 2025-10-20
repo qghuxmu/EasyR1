@@ -101,6 +101,10 @@ class AlgorithmConfig:
     """filter out low reward samples if online filtering"""
     filter_high: float = 0.99
     """filter out high reward samples if online filtering"""
+    rollout_negative_samples: int = 3
+    """number of negative samples to rollout for each prompt"""
+    penalty_coef: float = 1.0
+    """penalty coefficient for negative samples"""
 
 
 @dataclass

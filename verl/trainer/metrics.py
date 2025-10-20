@@ -49,6 +49,8 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = False) -> dict[str
     sequence_score = batch.batch["token_level_scores"].sum(-1)
     sequence_reward = batch.batch["token_level_rewards"].sum(-1)
 
+    negatives_acc = batch.batch["negatives_accuracy"].mean(-1)
+
     advantages = batch.batch["advantages"]
     returns = batch.batch["returns"]
 
@@ -65,6 +67,10 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = False) -> dict[str
         return_var = torch.var(valid_returns)
 
     return {
+        # negatives
+        "critic/negatives_acc/mean": torch.mean(negatives_acc).detach().item(),
+        "critic/negatives_acc/max": torch.max(negatives_acc).detach().item(),
+        "critic/negatives_acc/min": torch.min(negatives_acc).detach().item(),
         # score
         "critic/score/mean": torch.mean(sequence_score).detach().item(),
         "critic/score/max": torch.max(sequence_score).detach().item(),

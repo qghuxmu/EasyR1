@@ -179,6 +179,36 @@ class RLHFDataset(Dataset):
         else:
             return [{"role": "user", "content": prompt_str}]
 
+    def _build_text_only_messages(self, example: dict[str, Any]) -> list[dict[str, Any]]:
+        prompt_str: str = example[self.prompt_key]
+        if self.format_prompt:
+            format_prompt = Template(self.format_prompt.strip())
+            prompt_str = format_prompt.render(content=prompt_str)
+
+        if self.image_key in example:
+            # https://huggingface.co/docs/transformers/en/tasks/image_text_to_text
+            content_list = []
+            for i, content in enumerate(prompt_str.split("<image>")):
+                # if i != 0:
+                #     content_list.append({"type": "image"})
+
+                if content:
+                    content_list.append({"type": "text", "text": content})
+
+            return [{"role": "user", "content": content_list}]
+        elif self.video_key in example:
+            content_list = []
+            for i, content in enumerate(prompt_str.split("<video>")):
+                if i != 0:
+                    content_list.append({"type": "video"})
+
+                if content:
+                    content_list.append({"type": "text", "text": content})
+
+            return [{"role": "user", "content": content_list}]
+        else:
+            return [{"role": "user", "content": prompt_str}]
+
     def _filter_overlong_prompts(self, example: dict[str, Any]) -> bool:
         messages = self._build_messages(example)
         if self.image_key in example:
@@ -217,10 +247,12 @@ class RLHFDataset(Dataset):
     def __getitem__(self, index):
         example: dict = self.dataset[index]
         messages = self._build_messages(example)
+        text_only_messages = self._build_text_only_messages(example)
         example.pop(self.prompt_key, None)
 
         if self.image_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+            text_only_prompt = self.processor.apply_chat_template(text_only_messages, add_generation_prompt=True, tokenize=False)
             images = example.pop(self.image_key)
             images = images if isinstance(images, list) else [images]
             if self.image_dir is not None and len(images) != 0 and isinstance(images[0], str):  # image paths
@@ -231,8 +263,11 @@ class RLHFDataset(Dataset):
                 processed_images.append(process_image(image, self.min_pixels, self.max_pixels))
 
             model_inputs = self.processor(processed_images, [prompt], add_special_tokens=False, return_tensors="pt")
+            text_only_model_inputs = self.processor(text=[text_only_prompt], add_special_tokens=False, return_tensors="pt")
             input_ids = model_inputs.pop("input_ids")[0]
             attention_mask = model_inputs.pop("attention_mask")[0]
+            text_only_input_ids = text_only_model_inputs.pop("input_ids")[0]
+            text_only_attention_mask = text_only_model_inputs.pop("attention_mask")[0]
             example["multi_modal_data"] = {"images": images}
         elif self.video_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
@@ -281,6 +316,17 @@ class RLHFDataset(Dataset):
             )  # (3, seq_length)
             text_position_ids = torch.arange(len(input_ids)).unsqueeze(0)  # (1, seq_length)
             position_ids = torch.cat((text_position_ids, vision_position_ids), dim=0)  # (4, seq_length)
+
+            text_only_vision_position_ids = get_rope_index(
+                self.processor,
+                input_ids=text_only_input_ids,
+                image_grid_thw=None,
+                video_grid_thw=None,
+                second_per_grid_ts=None,
+                attention_mask=text_only_attention_mask,
+            )  # (3, seq_length)
+            text_only_text_position_ids = torch.arange(len(text_only_input_ids)).unsqueeze(0)  # (1, seq_length)
+            text_only_position_ids = torch.cat((text_only_text_position_ids, text_only_vision_position_ids), dim=0)  # (4, seq_length)
         else:
             position_ids = torch.clip(attention_mask.cumsum(dim=0) - 1, min=0, max=None)  # (seq_length,)
 
@@ -302,9 +348,31 @@ class RLHFDataset(Dataset):
             elif self.truncation == "error":
                 raise RuntimeError(f"Prompt length {len(raw_prompt_ids)} is longer than {self.max_prompt_length}.")
 
+        text_only_input_ids, text_only_attention_mask, text_only_position_ids = VF.postprocess_data(
+            input_ids=text_only_input_ids,
+            attention_mask=text_only_attention_mask,
+            position_ids=text_only_position_ids,
+            max_length=self.max_prompt_length,
+            pad_token_id=self.tokenizer.pad_token_id,
+            left_pad=True,
+            truncation=self.truncation,
+        )
+        text_only_raw_prompt_ids = self.tokenizer.encode(text_only_prompt, add_special_tokens=False)
+        if len(text_only_raw_prompt_ids) > self.max_prompt_length:
+            if self.truncation == "left":
+                text_only_raw_prompt_ids = text_only_raw_prompt_ids[-self.max_prompt_length :]
+            elif self.truncation == "right":
+                text_only_raw_prompt_ids = text_only_raw_prompt_ids[: self.max_prompt_length]
+            elif self.truncation == "error":
+                raise RuntimeError(f"Prompt length {len(text_only_raw_prompt_ids)} is longer than {self.max_prompt_length}.")
+
         example["input_ids"] = input_ids
         example["attention_mask"] = attention_mask
         example["position_ids"] = position_ids
         example["raw_prompt_ids"] = raw_prompt_ids
+        example["text_only_input_ids"] = text_only_input_ids
+        example["text_only_attention_mask"] = text_only_attention_mask
+        example["text_only_position_ids"] = text_only_position_ids
+        example["text_only_raw_prompt_ids"] = text_only_raw_prompt_ids
         example["ground_truth"] = example.pop(self.answer_key)
         return example
