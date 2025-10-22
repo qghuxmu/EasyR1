@@ -152,6 +152,7 @@ def compute_advantage(data: DataProto, adv_estimator: AdvantageEstimator, gamma:
     if "negatives_accuracy" in data.batch:
         adv_inputs["negatives_accuracy"] = data.batch["negatives_accuracy"]
         adv_inputs["penalty_coef"] = data.meta_info["penalty_coef"]
+        adv_inputs["apply_penalty_mask"] = data.meta_info["apply_penalty_mask"]
 
     advantages, returns = compute_advantage_return(adv_estimator, **adv_inputs)
     data.batch["advantages"] = advantages
@@ -534,6 +535,7 @@ class RayPPOTrainer:
 
                 new_batch.batch["negatives_accuracy"] = negatives_accuracy
                 new_batch.meta_info["penalty_coef"] = self.config.algorithm.penalty_coef
+                new_batch.meta_info["apply_penalty_mask"] = self.config.algorithm.apply_penalty_mask
                 del gen_negative_batch, gen_negative_output, new_negative_batch
 
             # repeat to align with repeated responses in rollout

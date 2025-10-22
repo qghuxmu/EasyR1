@@ -105,6 +105,8 @@ class AlgorithmConfig:
     """number of negative samples to rollout for each prompt"""
     penalty_coef: float = 1.0
     """penalty coefficient for negative samples"""
+    apply_penalty_mask: bool = True
+    """apply penalty mask"""
 
 
 @dataclass

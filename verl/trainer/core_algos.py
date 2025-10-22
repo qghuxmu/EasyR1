@@ -215,7 +215,7 @@ def compute_grpo_outcome_advantage(
 # NOTE(sgm): this implementation only consider outcome supervision, where the reward is a scalar.
 @register_adv_estimator(AdvantageEstimator.GRPO_NEG)
 def compute_grpo_outcome_advantage_with_negatives(
-    token_level_rewards: torch.Tensor, negatives_accuracy: torch.Tensor, response_mask: torch.Tensor, index: torch.Tensor, eps: float = 1e-6, penalty_coef: float = 1.0, **kwargs
+    token_level_rewards: torch.Tensor, negatives_accuracy: torch.Tensor, response_mask: torch.Tensor, index: torch.Tensor, eps: float = 1e-6, penalty_coef: float = 1.0, apply_penalty_mask=True, **kwargs
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Compute advantage for GRPO, operating only on Outcome reward (with only one scalar reward for each response).
@@ -254,8 +254,11 @@ def compute_grpo_outcome_advantage_with_negatives(
         scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + eps)
 
     # If advantage > 0, multiply by (1 - neg_acc)
-    penalty_mask = (scores > 0).float()
-    scores = scores * (1 - penalty_coef * penalty_mask * negatives_accuracy)
+    if apply_penalty_mask:
+        penalty_mask = (scores > 0).float()
+        scores = scores * (1 - penalty_coef * penalty_mask * negatives_accuracy)
+    else:
+        scores = scores * (1 - penalty_coef * negatives_accuracy)
 
     returns = scores.unsqueeze(-1) * response_mask
     return returns, returns
