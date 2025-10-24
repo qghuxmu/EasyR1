@@ -516,14 +516,18 @@ class RayPPOTrainer:
                 del gen_baseline_batch, gen_baseline_output
 
             if self.config.algorithm.adv_estimator == "grpo_neg":
-                gen_negative_batch = DataProto.from_single_dict(
-                    {
-                        "input_ids": new_batch.batch.pop("text_only_input_ids"),
-                        "attention_mask": new_batch.batch.pop("text_only_attention_mask"),
-                        "position_ids": new_batch.batch.pop("text_only_position_ids"),
-                        "raw_prompt_ids": new_batch.non_tensor_batch.pop("text_only_raw_prompt_ids")
-                    }
-                )
+                if self.config.algorithm.negatives_type == "random_img":
+                    gen_negative_batch = deepcopy(gen_batch)
+                    np.random.shuffle(gen_negative_batch.non_tensor_batch["multi_modal_data"])
+                elif self.config.algorithm.negatives_type == "text_only":
+                    gen_negative_batch = DataProto.from_single_dict(
+                        {
+                            "input_ids": new_batch.batch.pop("text_only_input_ids"),
+                            "attention_mask": new_batch.batch.pop("text_only_attention_mask"),
+                            "position_ids": new_batch.batch.pop("text_only_position_ids"),
+                            "raw_prompt_ids": new_batch.non_tensor_batch.pop("text_only_raw_prompt_ids")
+                        }
+                    )
                 gen_negative_batch.meta_info["n"] = self.config.algorithm.rollout_negative_samples
                 gen_negative_output = self.actor_rollout_ref_wg.generate_sequences(gen_negative_batch)
 

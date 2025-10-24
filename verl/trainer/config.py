@@ -107,6 +107,8 @@ class AlgorithmConfig:
     """penalty coefficient for negative samples"""
     apply_penalty_mask: bool = True
     """apply penalty mask"""
+    negatives_type: str = "text_only"
+    """type of negatives, support `text_only`, `random_img`"""
 
 
 @dataclass
