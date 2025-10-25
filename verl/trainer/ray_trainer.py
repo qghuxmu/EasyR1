@@ -518,7 +518,7 @@ class RayPPOTrainer:
             if self.config.algorithm.adv_estimator == "grpo_neg":
                 if self.config.algorithm.negatives_type == "random_img":
                     gen_negative_batch = deepcopy(gen_batch)
-                    # np.random.shuffle(gen_negative_batch.non_tensor_batch["multi_modal_data"])
+                    np.random.shuffle(gen_negative_batch.non_tensor_batch["multi_modal_data"])
                 elif self.config.algorithm.negatives_type == "text_only":
                     gen_negative_batch = DataProto.from_single_dict(
                         {
