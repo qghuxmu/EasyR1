@@ -253,10 +253,12 @@ def compute_grpo_outcome_advantage_with_negatives(
     for i in range(bsz):
         scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + eps)
 
-    # If advantage > 0, multiply by (1 - neg_acc)
     if apply_penalty_mask:
-        penalty_mask = (scores > 0).float()
-        scores = scores * (1 - penalty_coef * penalty_mask * negatives_accuracy)
+        pos_mask = (scores > 0)
+        avg_mask = (negatives_accuracy < negatives_accuracy.mean())
+        boost_mask = (pos_mask & avg_mask).float()
+        boost_factor = (1 - negatives_accuracy) ** 2
+        scores = scores * (1 + penalty_coef * boost_mask * boost_factor)
     else:
         scores = scores * (1 - penalty_coef * negatives_accuracy)
 
